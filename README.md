@@ -30,6 +30,23 @@ With bb 4.2.0-aztecnr-rc.2 proofs and forge on this repository:
 | registration proof, keccak flavor | 11,072 bytes |
 | nullifier proof, keccak flavor | 7,616 bytes |
 
+And the other proving system, for the same kind of statement:
+
+| What | Groth16 | UltraHonk |
+|---|---:|---:|
+| verifying one predicate, gas | 222,345 | part of the 5,520,416 above |
+| verifier, deployed code | 1,718 bytes | 24,254 bytes |
+| proof | 256 bytes | 11,072 bytes |
+
+That is the trade in one table. Groth16 is twenty five times cheaper to
+verify and fourteen times smaller as a contract, and it costs a per circuit
+phase 2 ceremony that UltraHonk does not need. A deployment that will not
+run a ceremony has the other option and pays for it here.
+
+The Groth16 verifier in `src/CompareVerifier.sol` is tied to one proving
+key, so it is tied to one ceremony. The one committed here belongs to a
+local development contribution and is fit for tests and nothing else.
+
 Those two numbers are the design in one line. Almost everything a
 registration costs is verifying the proofs and carrying eighteen kilobytes
 of them as calldata; the contract's own work is 74,154 gas, nearly all of it

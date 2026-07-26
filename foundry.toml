@@ -19,4 +19,5 @@ optimizer_runs = 1
 fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 
 [fmt]
-ignore = ["src/RegistrationVerifier.sol", "src/NullifierVerifier.sol"]
+ignore = ["src/RegistrationVerifier.sol", "src/NullifierVerifier.sol", "src/CompareVerifier.sol"]
+
