@@ -21,6 +21,25 @@ import {IVerifier} from "./RegistrationVerifier.sol";
 /// stores one value per document, not per person, so a reissued document
 /// registers again under a new nullifier, and retiring the old one is an
 /// application decision this reference contract does not take.
+///
+/// One design constraint holds this contract cheap, and it is worth stating
+/// because breaking it is easy and expensive.
+///
+/// The circuits hash with Poseidon2, which is chosen for what it costs
+/// inside a circuit, and no chain has a precompile for it. Recomputing a
+/// Poseidon2 in Solidity would cost more than everything this function does
+/// apart from verifying the proofs. It is never necessary, because every
+/// Poseidon2 is computed inside a proof and reaches the chain as a public
+/// input: this contract compares field elements and stores one, and derives
+/// nothing. The proofs' own transcript uses keccak, which is why they are
+/// produced with the keccak oracle, and this contract uses keccak only
+/// where Solidity's storage layout does, to address a mapping.
+///
+/// The constraint breaks the moment this contract maintains a structure it
+/// has to hash into, an accumulator of commitments for instance, since
+/// inserting into one means computing Poseidon2 per level on chain. A test
+/// measures the contract's own cost with verification removed, so that
+/// giving this up would show as a number rather than as nothing.
 contract ZkIcaoRegistry {
     /// registration public inputs, in layout order:
     /// [domain, context, commitment, secret_binding, current_yyyymmdd, registry_root]

@@ -12,6 +12,15 @@ import {ZkIcaoRegistry} from "../src/ZkIcaoRegistry.sol";
 /// under test/fixtures. The fixtures were proved with domain 42 and context
 /// 99, so the registering sender must be address(99): the context is the
 /// sender, and these tests exercise exactly that binding.
+/// Stands in for a verifier so a test can measure the contract's own logic.
+/// It accepts everything, which is exactly why it is only ever used to
+/// measure and never to check.
+contract AlwaysAccepts {
+    function verify(bytes calldata, bytes32[] calldata) external pure returns (bool) {
+        return true;
+    }
+}
+
 contract ZkIcaoRegistryTest is Test {
     ZkIcaoRegistry registry;
 
@@ -180,6 +189,49 @@ contract ZkIcaoRegistryTest is Test {
         // The margin is small enough that a circuit change can cross it, so
         // this records what it was rather than only that it passed.
         assertGt(registrationSize, limit / 2, "the verifier shrank unexpectedly, re-measure");
+    }
+
+    /// What the registry's own logic costs, with verification removed.
+    ///
+    /// The point is the ratio. Everything this contract does itself, the
+    /// comparisons, the date window and two storage writes, is a rounding
+    /// error beside verifying the proofs, and it stays that way only while
+    /// the contract derives nothing. A Poseidon2 recomputed here would not
+    /// be a rounding error, which is why the design keeps every hash inside
+    /// a proof and lets it arrive as a public input.
+    function test_the_registry_costs_little_beside_the_verification() public {
+        AlwaysAccepts accepts = new AlwaysAccepts();
+
+        ZkIcaoRegistry cheap = new ZkIcaoRegistry(
+            IVerifier(address(accepts)),
+            IVerifier(address(accepts)),
+            registrationInputs[0],
+            registrationInputs[5],
+            20260101,
+            20261231
+        );
+
+        // Empty proofs, since the stand in ignores them. Passing the real
+        // ones would measure the calldata of eighteen kilobytes rather than
+        // the logic: that cost is real but it is the proof's, not this
+        // contract's, and it is what proof size buys back.
+        vm.prank(HOLDER);
+
+        uint256 before = gasleft();
+
+        cheap.register("", registrationInputs, "", nullifierInputs);
+
+        uint256 own = before - gasleft();
+
+        emit log_named_uint("the registry's own logic, gas", own);
+
+        // Measured at 74,154, and storage is nearly all of it: two writes
+        // from zero at 22,100 each, plus the event, two external calls, the
+        // cold accounts and the inputs' own calldata. Nothing is
+        // computation. The bound leaves room for those to shift and still
+        // catches a hash: a Poseidon2 is tens of thousands of gas, and
+        // inserting into a Merkle structure is one per level.
+        assertLt(own, 100_000, "the registry derives something it should not");
     }
 
     /// A registration has to fit in a block. Mainnet targets 15 million gas

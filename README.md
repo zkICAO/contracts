@@ -24,10 +24,31 @@ With bb 4.2.0-aztecnr-rc.2 proofs and forge on this repository:
 | What | Number |
 |---|---:|
 | `register()` gas, both verifications plus storage | 6,518,161 |
+| of which the registry's own logic | 74,154 |
 | registration verifier, deployed code | 24,254 bytes |
 | margin to the EIP-170 limit | 322 bytes |
 | registration proof, keccak flavor | 11,072 bytes |
 | nullifier proof, keccak flavor | 7,616 bytes |
+
+Those two numbers are the design in one line. Almost everything a
+registration costs is verifying the proofs and carrying eighteen kilobytes
+of them as calldata; the contract's own work is 74,154 gas, nearly all of it
+two storage writes. It stays that way only because the contract derives
+nothing.
+
+That matters specifically for the hash. The circuits use Poseidon2, chosen
+for what it costs inside a circuit, and no chain has a precompile for it, so
+recomputing one here would be tens of thousands of gas each. It is never
+needed: every Poseidon2 runs inside a proof and arrives as a public input,
+leaving the contract to compare field elements. The proofs' transcript uses
+keccak, which is why they are produced with the keccak oracle, and the
+contract uses keccak only where Solidity's storage layout does, to address a
+mapping.
+
+The constraint would break if this contract maintained a structure it had to
+hash into, an accumulator of commitments for instance, since inserting means
+one Poseidon2 per level. A test measures the contract's own cost with
+verification removed so that giving this up shows as a number.
 
 That margin is the number to watch. The optimizer setting in `foundry.toml` is load bearing rather than a preference: at Foundry's default of 200 runs the verifier is 25,184 bytes and cannot be deployed to any chain, and with the optimizer off it is 33,880. A test measures the deployed code so this cannot regress quietly, and the EVM version is pinned for the same reason a gas number needs one.
 
