@@ -23,9 +23,13 @@ With bb 4.2.0-aztecnr-rc.2 proofs and forge on this repository:
 
 | What | Number |
 |---|---:|
-| `register()` gas, both verifications plus storage | 6,518,172 |
+| `register()` gas, both verifications plus storage | 6,518,161 |
+| registration verifier, deployed code | 24,254 bytes |
+| margin to the EIP-170 limit | 322 bytes |
 | registration proof, keccak flavor | 11,072 bytes |
 | nullifier proof, keccak flavor | 7,616 bytes |
+
+That margin is the number to watch. The optimizer setting in `foundry.toml` is load bearing rather than a preference: at Foundry's default of 200 runs the verifier is 25,184 bytes and cannot be deployed to any chain, and with the optimizer off it is 33,880. A test measures the deployed code so this cannot regress quietly, and the EVM version is pinned for the same reason a gas number needs one.
 
 The proving cost sits on the holder's device, not here: the recursive registration proof takes about 14 seconds on a laptop.
 
@@ -34,6 +38,12 @@ The proving cost sits on the holder's device, not here: the recursive registrati
 `forge test -vv`. The fixtures under `test/fixtures` are real proofs produced by the circuits repository's bundle command over a generated Doc 9303 document, committed as the fixture of record like the circuit test data. Regenerating the bundle produces fresh keys, so regenerating fixtures means recopying all four files together; a mixed set describes two documents and fails.
 
 Covered: a registration that verifies with its gas measured, the same document twice, a proof bound to another sender, a tampered proof of either kind, a nullifier from another document, a registry the proof was not anchored to, and a proving date outside the window.
+
+## Deploying
+
+`script/Deploy.s.sol` deploys the two verifiers and one registry. Every policy value comes from the environment and every one is required, because none of them have a sensible default: a default domain would put two applications in one scope, and a default trust root would anchor to a set nobody chose. Copy `.env.example`, which has a placeholder and an explanation in each slot, and fill it in.
+
+No key material is read by any file here. The signer is passed to forge, against a keystore account or a hardware wallet.
 
 ## What this is not
 
