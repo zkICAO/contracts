@@ -23,7 +23,7 @@ With bb 4.2.0-aztecnr-rc.2 proofs and forge on this repository:
 
 | What | Number |
 |---|---:|
-| `register()` gas, both verifications plus storage | 6,518,161 |
+| `register()` gas on a chain, both verifications plus storage | 5,520,416 |
 | of which the registry's own logic | 74,154 |
 | registration verifier, deployed code | 24,254 bytes |
 | margin to the EIP-170 limit | 322 bytes |
@@ -59,6 +59,33 @@ The proving cost sits on the holder's device, not here: the recursive registrati
 `forge test -vv`. The fixtures under `test/fixtures` are real proofs produced by the circuits repository's bundle command over a generated Doc 9303 document, committed as the fixture of record like the circuit test data. Regenerating the bundle produces fresh keys, so regenerating fixtures means recopying all four files together; a mixed set describes two documents and fails.
 
 Covered: a registration that verifies with its gas measured, the same document twice, a proof bound to another sender, a tampered proof of either kind, a nullifier from another document, a registry the proof was not anchored to, and a proving date outside the window.
+
+## Running it on a chain
+
+`script/devnet.sh` deploys and registers against a node. It points at a
+local devnet by default, because that needs nobody's funds and nobody's key
+and the EVM it runs is the same EVM; set `RPC_URL` and `PRIVATE_KEY` and the
+same script runs against a testnet.
+
+It is not a substitute for the tests, it checks what a test cannot: that the
+deploy script works, that the contracts fit and deploy, that a node accepts a
+transaction carrying eighteen kilobytes of proof, and what a registration
+costs in a real block. Measured on a devnet: deployment succeeds, the
+registration costs 5,520,416 gas, the commitment and the nullifier are
+readable on chain afterwards, and a second registration of the same document
+reverts.
+
+One thing has to line up. The contract takes the sender as the context, so
+the proofs must be bound to the address that will send them. The bundle
+takes that address:
+
+```
+ZKICAO_CONTEXT=$(python3 -c "print(int('<your sender>', 16))") \
+  cargo run -- bundle
+```
+
+The script refuses to run if the fixtures are bound to anyone else, rather
+than sending a transaction that reverts.
 
 ## Deploying
 

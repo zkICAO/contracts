@@ -24,7 +24,7 @@ contract AlwaysAccepts {
 contract ZkIcaoRegistryTest is Test {
     ZkIcaoRegistry registry;
 
-    address constant HOLDER = address(uint160(99));
+    address HOLDER;
 
     bytes registrationProof;
 
@@ -42,6 +42,8 @@ contract ZkIcaoRegistryTest is Test {
         nullifierProof = vm.readFileBinary("test/fixtures/nullifier.proof");
 
         nullifierInputs = split(vm.readFileBinary("test/fixtures/nullifier.inputs"));
+
+        HOLDER = address(uint160(uint256(registrationInputs[1])));
 
         registry = new ZkIcaoRegistry(
             IVerifier(address(new RegistrationVerifier())),
