@@ -2,8 +2,20 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+
+# Pinned rather than left to the default, so a build here is the build that
+# would be deployed. A later hardfork changes gas costs and opcode
+# availability, and a measurement taken under one is not a measurement under
+# another.
+evm_version = "cancun"
+
+# Load bearing, not a preference. The generated verifier is within a few
+# hundred bytes of the EIP-170 contract size limit, and at the Foundry
+# default of 200 runs it exceeds the limit and cannot be deployed to any
+# chain. A test measures the deployed size so this cannot regress silently.
 optimizer = true
 optimizer_runs = 1
+
 fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 
 [fmt]

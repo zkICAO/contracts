@@ -151,6 +151,54 @@ contract ZkIcaoRegistryTest is Test {
         other.register(registrationProof, registrationInputs, nullifierProof, nullifierInputs);
     }
 
+    /// EIP-170 caps deployed code at 24,576 bytes. The generated verifiers
+    /// sit just under it, so this is the check that the contracts can be
+    /// deployed at all, on any chain, and it fails long before anyone
+    /// discovers it during a deployment. Measured on the deployed code
+    /// rather than an artifact, which is what a chain would see.
+    function test_the_verifiers_fit_the_contract_size_limit() public {
+        uint256 limit = 24_576;
+
+        address registration = address(registry.registrationVerifier());
+
+        address nullifier = address(registry.nullifierVerifier());
+
+        uint256 registrationSize = registration.code.length;
+
+        uint256 nullifierSize = nullifier.code.length;
+
+        emit log_named_uint("registration verifier bytes", registrationSize);
+
+        emit log_named_uint("margin to the limit", limit - registrationSize);
+
+        emit log_named_uint("nullifier verifier bytes", nullifierSize);
+
+        assertLt(registrationSize, limit, "the registration verifier cannot be deployed");
+
+        assertLt(nullifierSize, limit, "the nullifier verifier cannot be deployed");
+
+        // The margin is small enough that a circuit change can cross it, so
+        // this records what it was rather than only that it passed.
+        assertGt(registrationSize, limit / 2, "the verifier shrank unexpectedly, re-measure");
+    }
+
+    /// A registration has to fit in a block. Mainnet targets 15 million gas
+    /// and caps at 30 million, so a transaction near that ceiling is one no
+    /// builder will include.
+    function test_a_registration_fits_in_a_block() public {
+        vm.prank(HOLDER);
+
+        uint256 before = gasleft();
+
+        register();
+
+        uint256 used = before - gasleft();
+
+        emit log_named_uint("register() gas", used);
+
+        assertLt(used, 15_000_000, "a registration exceeds the mainnet gas target");
+    }
+
     function test_rejects_a_date_outside_the_window() public {
         ZkIcaoRegistry strict = new ZkIcaoRegistry(
             registry.registrationVerifier(),
