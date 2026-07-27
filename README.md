@@ -23,34 +23,40 @@ With bb 4.2.0-aztecnr-rc.2 proofs and forge on this repository:
 
 | What | Number |
 |---|---:|
-| `register()` gas on a chain, both verifications plus storage | 5,520,416 |
-| of which the registry's own logic | 74,154 |
+| `register()` transaction on a devnet, intrinsic and calldata included | 5,520,416 gas |
+| `register()` execution alone, metered in the test | 5,212,756 gas |
+| of which the registry's own logic | 52,813 gas |
 | registration verifier, deployed code | 24,254 bytes |
 | margin to the EIP-170 limit | 322 bytes |
 | registration proof, keccak flavor | 11,072 bytes |
 | nullifier proof, keccak flavor | 7,616 bytes |
 
+The two register() figures are the same run seen from two places: a node
+charges the transaction, the test meters the call, and the difference is
+the transaction intrinsics plus nineteen kilobytes of calldata.
+
 And the other proving system, for the same kind of statement:
 
 | What | Groth16 | UltraHonk |
 |---|---:|---:|
-| verifying one predicate, gas | 222,345 | part of the 5,520,416 above |
+| verifying one proof, gas | 222,345 | about 2,580,000 of the execution above |
 | verifier, deployed code | 1,718 bytes | 24,254 bytes |
 | proof | 256 bytes | 11,072 bytes |
 
-That is the trade in one table. Groth16 is twenty five times cheaper to
-verify and fourteen times smaller as a contract, and it costs a per circuit
-phase 2 ceremony that UltraHonk does not need. A deployment that will not
-run a ceremony has the other option and pays for it here.
+That is the trade in one table. A Groth16 verification is roughly eleven
+times cheaper than an UltraHonk one and the verifier is fourteen times
+smaller as a contract, and it costs a per circuit phase 2 ceremony that
+UltraHonk does not need. A deployment that will not run a ceremony has the
+other option and pays for it here.
 
 The Groth16 verifier in `src/CompareVerifier.sol` is tied to one proving
 key, so it is tied to one ceremony. The one committed here belongs to a
 local development contribution and is fit for tests and nothing else.
 
-Those two numbers are the design in one line. Almost everything a
-registration costs is verifying the proofs and carrying eighteen kilobytes
-of them as calldata; the contract's own work is 74,154 gas, nearly all of it
-two storage writes. It stays that way only because the contract derives
+Those numbers are the design in one line. Almost everything a registration
+costs is verifying the proofs and carrying eighteen kilobytes of them as
+calldata; the contract's own work is 52,813 gas, nearly all of it two
+storage writes. It stays that way only because the contract derives
 nothing.
 
 That matters specifically for the hash. The circuits use Poseidon2, chosen

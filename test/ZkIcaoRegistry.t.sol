@@ -8,10 +8,6 @@ import {HonkVerifier as NullifierVerifier} from "../src/NullifierVerifier.sol";
 import {IVerifier} from "../src/RegistrationVerifier.sol";
 import {ZkIcaoRegistry} from "../src/ZkIcaoRegistry.sol";
 
-/// Runs the registry over proofs the circuits actually produced, committed
-/// under test/fixtures. The fixtures were proved with domain 42 and context
-/// 99, so the registering sender must be address(99): the context is the
-/// sender, and these tests exercise exactly that binding.
 /// Stands in for a verifier so a test can measure the contract's own logic.
 /// It accepts everything, which is exactly why it is only ever used to
 /// measure and never to check.
@@ -21,6 +17,9 @@ contract AlwaysAccepts {
     }
 }
 
+/// Runs the registry over proofs the circuits actually produced, committed
+/// under test/fixtures. The context is the sender, so the registering
+/// sender is read out of the fixture's own public inputs and pranked.
 contract ZkIcaoRegistryTest is Test {
     ZkIcaoRegistry registry;
 
@@ -78,11 +77,23 @@ contract ZkIcaoRegistryTest is Test {
     }
 
     function test_registers_a_document_and_measures_gas() public {
+        // Copied out of the harness's storage before the meter starts. A
+        // real caller supplies these as calldata; reading eighteen kilobytes
+        // of test fixture out of cold storage inside the measured window
+        // would bill about a million gas of harness overhead to register().
+        bytes memory proof = registrationProof;
+
+        bytes32[] memory inputs = registrationInputs;
+
+        bytes memory nproof = nullifierProof;
+
+        bytes32[] memory ninputs = nullifierInputs;
+
         vm.prank(HOLDER);
 
         uint256 before = gasleft();
 
-        (bytes32 commitment, bytes32 nullifier) = register();
+        (bytes32 commitment, bytes32 nullifier) = registry.register(proof, inputs, nproof, ninputs);
 
         emit log_named_uint("register() gas", before - gasleft());
 
@@ -216,21 +227,26 @@ contract ZkIcaoRegistryTest is Test {
         // Empty proofs, since the stand in ignores them. Passing the real
         // ones would measure the calldata of eighteen kilobytes rather than
         // the logic: that cost is real but it is the proof's, not this
-        // contract's, and it is what proof size buys back.
+        // contract's, and it is what proof size buys back. The inputs are
+        // copied out of the harness's storage before the meter starts for
+        // the same reason the registration measurement copies them.
+        bytes32[] memory inputs = registrationInputs;
+
+        bytes32[] memory ninputs = nullifierInputs;
+
         vm.prank(HOLDER);
 
         uint256 before = gasleft();
 
-        cheap.register("", registrationInputs, "", nullifierInputs);
+        cheap.register("", inputs, "", ninputs);
 
         uint256 own = before - gasleft();
 
         emit log_named_uint("the registry's own logic, gas", own);
 
-        // Measured at 74,154, and storage is nearly all of it: two writes
-        // from zero at 22,100 each, plus the event, two external calls, the
-        // cold accounts and the inputs' own calldata. Nothing is
-        // computation. The bound leaves room for those to shift and still
+        // Storage is nearly all of it: two writes from zero at 22,100 each,
+        // plus the event, two external calls and the cold accounts. Nothing
+        // is computation. The bound leaves room for those to shift and still
         // catches a hash: a Poseidon2 is tens of thousands of gas, and
         // inserting into a Merkle structure is one per level.
         assertLt(own, 100_000, "the registry derives something it should not");
@@ -240,11 +256,19 @@ contract ZkIcaoRegistryTest is Test {
     /// and caps at 30 million, so a transaction near that ceiling is one no
     /// builder will include.
     function test_a_registration_fits_in_a_block() public {
+        bytes memory proof = registrationProof;
+
+        bytes32[] memory inputs = registrationInputs;
+
+        bytes memory nproof = nullifierProof;
+
+        bytes32[] memory ninputs = nullifierInputs;
+
         vm.prank(HOLDER);
 
         uint256 before = gasleft();
 
-        register();
+        registry.register(proof, inputs, nproof, ninputs);
 
         uint256 used = before - gasleft();
 
